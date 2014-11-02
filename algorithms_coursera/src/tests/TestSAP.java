@@ -65,14 +65,6 @@ public class TestSAP {
         assertTrue(sap.length(1, 5) == sap.length(5, 1));
     }
 
-
-
-//    @Test(expected = IllegalArgumentException.class)
-//    public void testDigraphWithCycle() {
-//        In in = new In("src\\tests\\data\\digraph3.txt");
-//        SAP sap = new SAP(new Digraph(in));
-//    }
-
     @Test(expected = IndexOutOfBoundsException.class)
     public void testLengthAncestorException() {
         In in = new In("src\\tests\\data\\digraph1.txt");

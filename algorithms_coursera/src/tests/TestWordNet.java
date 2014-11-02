@@ -53,4 +53,18 @@ public class TestWordNet {
         assertEquals("physical_entity", wn.sap("individual", "edible_fruit"));
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void testWordNethWithCycle() {
+        String synsets = "src\\tests\\data\\synsets3.txt";
+        String hypernyms = "src\\tests\\data\\hypernymsInvalidCycle.txt";
+        new WordNet(synsets, hypernyms);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testWordNethWithTwoRoots() {
+        String synsets = "src\\tests\\data\\synsets3.txt";
+        String hypernyms = "src\\tests\\data\\hypernymsInvalidTwoRoots.txt";
+        new WordNet(synsets, hypernyms);
+    }
+
 }

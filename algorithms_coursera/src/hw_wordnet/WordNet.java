@@ -1,5 +1,7 @@
 package hw_wordnet;
 
+import java.util.Iterator;
+
 import edu.princeton.cs.algs4.Bag;
 import edu.princeton.cs.algs4.Digraph;
 import edu.princeton.cs.algs4.SeparateChainingHashST;
@@ -13,6 +15,7 @@ public class WordNet {
     private Digraph digraph;
     private boolean[] marked; // marked[v] = has vertex v been marked?
     private boolean[] onStack; // onStack[v] = is vertex on the stack?
+    private int count; // number of vertices with no adjacent vertices
     private SAP sap;
     /**
      * Constructor which takes the name of the two input files
@@ -28,7 +31,7 @@ public class WordNet {
         }
         V = parseSynsets(synsets);
         digraph = parseHypernyms(hypernyms);
-        if (!isDAG(digraph)) {
+        if (!isRootedDAG(digraph)) {
             throw new IllegalArgumentException("input should be a rooted DAG");
         }
         sap = new SAP(digraph);
@@ -113,7 +116,7 @@ public class WordNet {
         tableNoun = new SeparateChainingHashST<String, Bag<Integer>>();
         tableID = new SeparateChainingHashST<Integer, String>();
         In in = new In(synsets);
-        int count = 0;
+        int lines = 0;
         while (in.hasNextLine()) {
             String line = in.readLine();
             String[] fields = line.split(",");
@@ -129,9 +132,9 @@ public class WordNet {
                 }
             }
             tableID.put(id, fields[1]);
-            count++;
+            lines++;
         }
-        return count;
+        return lines;
     }
 
     // parse hypernyms information from the file with name synsets
@@ -149,12 +152,12 @@ public class WordNet {
     }
 
     // check if the digraph G is a rooted directed acyclic graph (DAG)
-    private boolean isDAG(Digraph G) {
+    private boolean isRootedDAG(Digraph G) {
         marked = new boolean[G.V()];
         onStack = new boolean[G.V()];
         for (int v = 0; v < G.V(); v++) {
             if (!marked[v]) {
-                if (!isDAG(G, v)) {
+                if (!dfs(G, v)) {
                     return false;
                 }
             }
@@ -162,23 +165,29 @@ public class WordNet {
         return true;
     }
 
-    // do DFS from v to check if there is a cycle
-    private boolean isDAG(Digraph G, int v) {
+    // do DFS from v to check if there is a cycle or there are multiple roots
+    private boolean dfs(Digraph G, int v) {
         onStack[v] = true;
         marked[v] = true;
         boolean result = true;
+        int adj = 0;
         for (int w : G.adj(v)) {
+            adj++;
             if (onStack[w]) {
                 result = false;
             }
             if (!marked[w]) {
-                result = isDAG(G, w);
+                result = dfs(G, w);
             }
         }
         onStack[v] = false;
+        // if v has no neighbours, update count.
+        // if updated count > 1, there are more than one roots. return false
+        if (adj == 0 && ++count > 1) {
+            return false;
+        }
         return result;
     }
-
 
     // for unit testing of this class
     public static void main(String[] args) {
