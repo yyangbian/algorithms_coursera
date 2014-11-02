@@ -36,5 +36,21 @@ public class TestWordNet {
         assertTrue(count > 82192);
     }
 
+    @Test
+    public void testDistance() {
+        assertEquals(5, wn.distance("worm", "bird"));
+        assertEquals(23, wn.distance("white_marlin", "mileage"));
+        assertEquals(33, wn.distance("Black_Plague", "black_marlin"));
+        assertEquals(27, wn.distance("American_water_spaniel", "histology"));
+        assertEquals(29, wn.distance("Brown_Swiss", "barrel_roll"));
+        assertEquals(7, wn.distance("individual", "edible_fruit"));
+    }
+
+    @Test
+    public void testSAP() {
+        assertEquals("animal animate_being beast brute creature fauna", 
+                wn.sap("worm", "bird"));
+        assertEquals("physical_entity", wn.sap("individual", "edible_fruit"));
+    }
 
 }

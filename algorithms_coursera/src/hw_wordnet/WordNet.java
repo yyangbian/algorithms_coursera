@@ -1,26 +1,37 @@
 package hw_wordnet;
 
+import edu.princeton.cs.algs4.Bag;
 import edu.princeton.cs.algs4.Digraph;
 import edu.princeton.cs.algs4.SeparateChainingHashST;
 import edu.princeton.cs.introcs.In;
 import edu.princeton.cs.introcs.StdOut;
 
 public class WordNet {
-    private SeparateChainingHashST<String, Integer> table;
+    private SeparateChainingHashST<String, Bag<Integer>> tableNoun;
+    private SeparateChainingHashST<Integer, String> tableID;
     private final int V;
     private Digraph digraph;
+    private boolean[] marked; // marked[v] = has vertex v been marked?
+    private boolean[] onStack; // onStack[v] = is vertex on the stack?
+    private SAP sap;
     /**
      * Constructor which takes the name of the two input files
      *
      * @param synsets file name containing a list of noun synsets
      * @param hypernyms file name containing the hypernym relationship
-     * TODO:  throw a java.lang.IllegalArgumentException if the input does not correspond to a rooted DAG.
+     * @throws java.lang.IllegalArgumentException if input synsets is not DAG
+     * @throws java.lang.NullPointerException if any input argument is null
      */
     public WordNet(String synsets, String hypernyms) {
-        table = new SeparateChainingHashST<String, Integer>();
+        if (synsets == null || hypernyms == null) {
+            throw new java.lang.NullPointerException("inputs cannot be null!");
+        }
         V = parseSynsets(synsets);
-        digraph = new Digraph(V);
-        parseHypernyms(hypernyms);
+        digraph = parseHypernyms(hypernyms);
+        if (!isDAG(digraph)) {
+            throw new IllegalArgumentException("input should be a rooted DAG");
+        }
+        sap = new SAP(digraph);
     }
 
     /**
@@ -29,7 +40,7 @@ public class WordNet {
      * @return an Iterable
      */
     public Iterable<String> nouns() {
-        return table.keys();
+        return tableNoun.keys();
     }
 
     /**
@@ -37,9 +48,13 @@ public class WordNet {
      *
      * @param word the word to check
      * @return true if word is a WordNet noun
+     * @throws java.lang.NullPointerException if the input argument is null
      */
     public boolean isNoun(String word) {
-        return table.contains(word);
+        if (word == null) {
+            throw new java.lang.NullPointerException("inputs cannot be null!");
+        }
+        return tableNoun.contains(word);
     }
 
     /**
@@ -49,6 +64,7 @@ public class WordNet {
      * @param nounA
      * @param nounB
      * @return the distance between nounA and nounB
+     * @throws java.lang.NullPointerException if the input argument is null
      * @throws java.lang.IllegalArgumentException unless both noun arguments
      * are WordNet nouns
      */
@@ -59,17 +75,43 @@ public class WordNet {
         if (!isNoun(nounB)) {
             throw new IllegalArgumentException(nounB + " is not a WordNet noun.");
         }
-        return -1;
+        return sap.length(tableNoun.get(nounA), tableNoun.get(nounB));
     }
 
-    // a synset (second field of synsets.txt) that is the common ancestor of nounA and nounB
-    // in a shortest ancestral path (defined below)
+    /**
+     * Get a synset (second field of synsets.txt) that is the common ancestor
+     * of nounA and nounB in a shortest ancestral path.
+     *
+     * @param nounA
+     * @param nounB
+     * @return a synset
+     * @throws java.lang.NullPointerException if the input argument is null
+     * @throws java.lang.IllegalArgumentException unless both noun arguments
+     * are WordNet nouns
+     */
     public String sap(String nounA, String nounB) {
-        return "";
+        if (!isNoun(nounA)) {
+            throw new IllegalArgumentException(nounA
+                    + " is not a WordNet noun.");
+        }
+        if (!isNoun(nounB)) {
+            throw new IllegalArgumentException(nounB
+                    + " is not a WordNet noun.");
+        }
+        Iterable<Integer> v = tableNoun.get(nounA);
+        Iterable<Integer> w = tableNoun.get(nounB);
+        int ancestor = sap.ancestor(v, w);
+        if (ancestor == -1) {
+            return "";
+        } else {
+            return tableID.get(ancestor);
+        }
     }
 
     // parse synsets information from the file with name synsets
     private int parseSynsets(String synsets) {
+        tableNoun = new SeparateChainingHashST<String, Bag<Integer>>();
+        tableID = new SeparateChainingHashST<Integer, String>();
         In in = new In(synsets);
         int count = 0;
         while (in.hasNextLine()) {
@@ -78,24 +120,65 @@ public class WordNet {
             int id = Integer.parseInt(fields[0]);
             String[] nouns = fields[1].split(" ");
             for (String noun : nouns) {
-                table.put(noun, id);
+                if (isNoun(noun)) {
+                    tableNoun.get(noun).add(id);
+                } else {
+                    Bag<Integer> bag = new Bag<Integer>();
+                    bag.add(id);
+                    tableNoun.put(noun, bag);
+                }
             }
+            tableID.put(id, fields[1]);
             count++;
         }
         return count;
     }
 
     // parse hypernyms information from the file with name synsets
-    private void parseHypernyms(String hypernyms) {
+    private Digraph parseHypernyms(String hypernyms) {
+        Digraph dg = new Digraph(V);
         In in = new In(hypernyms);
         while (in.hasNextLine()) {
             String[] fields = in.readLine().split(",");
             int id = Integer.parseInt(fields[0]);
             for (int i = 1; i < fields.length; i++) {
-                digraph.addEdge(id, Integer.parseInt(fields[i]));
+                dg.addEdge(id, Integer.parseInt(fields[i]));
             }
         }
+        return dg;
     }
+
+    // check if the digraph G is a rooted directed acyclic graph (DAG)
+    private boolean isDAG(Digraph G) {
+        marked = new boolean[G.V()];
+        onStack = new boolean[G.V()];
+        for (int v = 0; v < G.V(); v++) {
+            if (!marked[v]) {
+                if (!isDAG(G, v)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // do DFS from v to check if there is a cycle
+    private boolean isDAG(Digraph G, int v) {
+        onStack[v] = true;
+        marked[v] = true;
+        boolean result = true;
+        for (int w : G.adj(v)) {
+            if (onStack[w]) {
+                result = false;
+            }
+            if (!marked[w]) {
+                result = isDAG(G, w);
+            }
+        }
+        onStack[v] = false;
+        return result;
+    }
+
 
     // for unit testing of this class
     public static void main(String[] args) {
