@@ -5,13 +5,13 @@ import java.awt.Color;
 import edu.princeton.cs.introcs.Picture;
 
 public class SeamCarver {
+    private static final int BORDER_ENERGY = 195075;
     private int[][] img;
     private int width, height;
     private double[][] energy;
     private double[][] distTo;
     private int[][] pixelTo;
     private boolean transposed;
-    private final static int BORDER_ENERGY = 195075;
 
     public SeamCarver(Picture picture) {
         width = picture.width();
